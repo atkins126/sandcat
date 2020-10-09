@@ -44,44 +44,76 @@ end
 
 function M:AddURLLogItemToList(sl, item)
  local unixtime = os.time(os.date("!*t"))
+ local canadd = true
  item.name = item.name or ''
  item.name = ctk.html.escape(item.name)
  item.url = ctk.html.escape(item.url)
  local id = tostring(unixtime)..'-'..tostring(sl.count)
  local linecontent = '<item id="'..id..'" url="'..item.url..'" name="'..item.name..'"/>'
- if (ctk.string.occur(sl.text, 'url="'..item.url..'"') == 0) then
+ if (ctk.string.occur(sl.text, 'url="'..item.url..'"') ~= 0) then
+   canadd = false
+ end 
+ if (item.repeatnameallow == false) and (ctk.string.occur(sl.text, 'name="'..item.name..'"') ~= 0) then
+   canadd = false
+   if (item.repeatnamewarn == true) then
+     app.showmessage(item.name..' already in list.')
+   end
+ end  
+ if (canadd == true) then
    sl:insert(0, linecontent)
  end
+ return canadd
 end
 
--- ToDo WIP: This function should soon replace procedure
--- TSandcatSettings.AddToURLList() in uSettings.pas
-function M:AddURLLogItem(item,logname)
+function M:IsURLInList(item,logname)
+ local inlist = false
  local logfile = browser.info.configdir..logname..'.sclist'
  local sl = ctk.string.list:new()
  if ctk.file.exists(logfile) then
   sl:loadfromfile(logfile)
  end
- self:AddURLLogItemToList(sl, item)
- sl:savetofile(logfile)
- sl:release()
+ if (ctk.string.occur(sl.text, 'url="'..item.url..'"') ~= 0) then
+   inlist = true
+ end 
+ sl:release() 
+ return inlist
 end
 
-function M:GetURLLogItemNames(logname)
- local liststr = ''
+-- ToDo WIP: This function should soon replace procedure
+-- TSandcatSettings.AddToURLList() in uSettings.pas
+function M:AddURLLogItem(item,logname)
+ local added = false
  local logfile = browser.info.configdir..logname..'.sclist'
- local l = ctk.string.list:new()
+ local sl = ctk.string.list:new()
+ if ctk.file.exists(logfile) then
+  sl:loadfromfile(logfile)
+ end
+ added = self:AddURLLogItemToList(sl, item)
+ sl:savetofile(logfile)
+ sl:release()
+ return added
+end
+
+-- Returns a table containing a list of ids and names
+function M:GetURLLogLists(logname)
+ local lists = {}
+ local logfile = browser.info.configdir..logname..'.sclist'
+ local names = ctk.string.list:new()
+ local ids = ctk.string.list:new() 
  local slp = ctk.string.loop:new()
  if ctk.file.exists(logfile) then
   slp:loadfromfile(logfile)
   while slp:parsing() do
-    l:add(self:GetValue(slp.current, 'name'))
+    names:add(self:GetValue(slp.current, 'name'))
+    ids:add(self:GetValue(slp.current, 'id'))    
   end
  end
- liststr = l.text
- l:release()
+ lists.namelist = names.text
+ lists.idlist = ids.text
+ names:release()
+ ids:release() 
  slp:release()
- return liststr
+ return lists
 end
 
 function M:GetValue(line, name)
